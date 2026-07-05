@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#12161b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Báscula">
+<link id="manifestLink" rel="manifest">
+<link id="appleIcon" rel="apple-touch-icon">
+<title>Báscula · Panel de peso y grasa</title>
+<style>
+:root{
+  --bg:#12161b; --panel:#1a2027; --panel2:#20272f; --border:#2b3440;
+  --txt:#e6e9ec; --dim:#8b98a5; --faint:#5c6873;
+  --peso:#5ec8f2; --grasa:#ff9066; --magra:#a4d96c; --acc:#ffd166; --cintura:#c792ea;
+  --ok:#7bd88f; --bad:#ff7a7a;
+  --mono:ui-monospace,'Cascadia Code','SF Mono',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,'Segoe UI',sans-serif;padding:12px;max-width:980px;margin:0 auto}
+h1{font-size:17px;font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px;margin-bottom:2px}
+h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--acc)}
+.sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
+.card h2{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.banner{background:#3a2f16;border:1px solid #6b5620;color:var(--acc);border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:12px;display:none}
+.banner b{cursor:pointer;text-decoration:underline}
+
+/* ---- entrada ---- */
+.entry{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;gap:8px;align-items:start}
+.field label{display:block;font-size:11px;color:var(--dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+.field input{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--txt);font:600 17px var(--mono);padding:9px 8px;text-align:center}
+.field input:focus{outline:none;border-color:var(--acc)}
+.field input.note{font:400 13.5px system-ui;text-align:left}
+.steppers{display:flex;gap:4px;margin-top:5px;justify-content:center}
+.steppers button{background:var(--panel2);border:1px solid var(--border);color:var(--dim);border-radius:6px;font:600 13px var(--mono);padding:3px 9px;cursor:pointer}
+.steppers button:active{background:var(--border);color:var(--txt)}
+.entry2{display:grid;grid-template-columns:1.4fr 2fr auto;gap:8px;margin-top:8px;align-items:start}
+#btnSave{background:var(--acc);color:#1a1a1a;border:none;border-radius:8px;font:700 15px system-ui;padding:11px 22px;cursor:pointer;height:42px}
+#btnSave:active{filter:brightness(.9)}
+#saveMsg{font-size:12.5px;margin-top:8px;min-height:16px}
+#saveMsg.ok{color:var(--ok)} #saveMsg.warn{color:var(--acc)}
+details{margin-top:10px}
+summary{color:var(--dim);font-size:12.5px;cursor:pointer;user-select:none}
+#batchTxt{width:100%;height:90px;margin-top:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--txt);font:13px var(--mono);padding:8px;resize:vertical}
+.hint{color:var(--faint);font-size:11.5px;margin-top:5px}
+.mini{background:var(--panel2);border:1px solid var(--border);color:var(--txt);border-radius:7px;font:600 12.5px system-ui;padding:6px 12px;cursor:pointer;margin-top:8px}
+
+/* ---- KPIs ---- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.kpi{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.kpi .l{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font:700 21px var(--mono);margin-top:2px}
+.kpi .s{font-size:11.5px;color:var(--faint);margin-top:1px}
+.kpi .v.peso{color:var(--peso)} .kpi .v.grasa{color:var(--grasa)} .kpi .v.magra{color:var(--magra)} .kpi .v.cint{color:var(--cintura)}
+.trend{font:600 12px var(--mono)} .trend.down{color:var(--ok)} .trend.up{color:var(--bad)} .trend.flat{color:var(--dim)}
+.sem{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+/* ---- gráfica ---- */
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font:600 13px system-ui;padding:4px 8px;cursor:pointer}
+.tabs button.on{color:var(--txt);border-bottom-color:var(--acc)}
+.ranges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ranges button,.yearsel label{background:var(--panel2);border:1px solid var(--border);color:var(--dim);border-radius:7px;font:600 12.5px system-ui;padding:5px 12px;cursor:pointer}
+.ranges button.on{background:var(--acc);color:#1a1a1a;border-color:var(--acc)}
+.yearsel{display:none;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.yearsel label{display:flex;align-items:center;gap:5px}
+.yearsel label.on{color:var(--txt);border-color:var(--acc)}
+.yearsel input{display:none}
+.yearsel .sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+.series-toggles{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px}
+.series-toggles label{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--dim)}
+.series-toggles .sw{width:18px;height:4px;border-radius:2px;display:inline-block}
+#chartWrap{position:relative}
+#chart{width:100%;height:340px;display:block;touch-action:pan-y}
+#tip{position:absolute;pointer-events:none;background:#0d1116ee;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font:12px var(--mono);display:none;z-index:5;white-space:nowrap;box-shadow:0 4px 14px #0008}
+#tip .td{color:var(--dim);margin-bottom:3px}
+#tip .tn{color:var(--acc);font:italic 11.5px system-ui;margin-top:3px;max-width:220px;white-space:normal}
+
+/* ---- conclusiones ---- */
+.insight{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:14px}
+.insight:last-child{border-bottom:none}
+.insight .ico{flex:0 0 22px;text-align:center}
+.insight b{font-family:var(--mono);font-weight:700}
+.insight .good{color:var(--ok)} .insight .warn2{color:var(--acc)} .insight .info{color:var(--peso)}
+
+/* ---- tablas ---- */
+table{width:100%;border-collapse:collapse;font:13px var(--mono)}
+th{font:600 10.5px system-ui;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);text-align:right;padding:6px 8px;border-bottom:1px solid var(--border)}
+th:first-child,td:first-child{text-align:left}
+td{padding:6px 8px;text-align:right;border-bottom:1px solid #232b34}
+tr:last-child td{border-bottom:none}
+tr.cur td{color:var(--acc)}
+.bar{display:inline-block;height:7px;border-radius:4px;background:var(--peso);vertical-align:middle;opacity:.75}
+
+/* ---- registros ---- */
+.reglist{max-height:280px;overflow-y:auto}
+.reg{display:grid;grid-template-columns:88px 1fr 1fr 1fr 1fr 30px;gap:5px;align-items:center;padding:6px 4px;border-bottom:1px solid #232b34;font:13px var(--mono)}
+.reg .d{color:var(--dim);font-size:12px}
+.reg .nt{color:var(--acc);font:italic 11.5px system-ui;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reg button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:15px}
+.reg button:hover{color:var(--bad)}
+
+/* ---- config ---- */
+.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.cfg .field input{font-size:15px}
+.hito{display:grid;grid-template-columns:90px 1fr 30px;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #232b34;font:13px var(--mono)}
+.hito button{background:none;border:none;color:var(--faint);cursor:pointer}
+.hitoAdd{display:grid;grid-template-columns:1fr 2fr auto;gap:6px;margin-top:8px}
+.hitoAdd input{background:var(--panel2);border:1px solid var(--border);border-radius:7px;color:var(--txt);font:13px var(--mono);padding:7px}
+
+/* ---- pie ---- */
+.iobar{display:flex;gap:8px;flex-wrap:wrap}
+.iobar button,.iobar label{background:var(--panel2);border:1px solid var(--border);color:var(--txt);border-radius:8px;font:600 13px system-ui;padding:9px 14px;cursor:pointer}
+.iobar input[type=file]{display:none}
+.foot{color:var(--faint);font-size:11.5px;text-align:center;margin:14px 0 6px;line-height:1.6}
+
+@media(max-width:640px){
+  .entry{grid-template-columns:1fr 1fr}
+  .entry .field:first-child{grid-column:1/-1}
+  .entry2{grid-template-columns:1fr}
+  #btnSave{width:100%}
+  #chart{height:280px}
+  .reg{grid-template-columns:80px 1fr 1fr 1fr 30px}
+  .reg .nt{display:none}
+}
+</style>
+</head>
+<body>
+
+<h1><span class="dot"></span>BÁSCULA · Panel de peso y grasa</h1>
+<div class="sub">Histórico 2015–hoy · offline · datos en este dispositivo (localStorage)</div>
+
+<div class="banner" id="bkBanner">⚠️ Llevas <span id="bkDays">?</span> días sin copia de seguridad. <b id="bkNow">Exportar JSON ahora</b></div>
+<div class="banner" id="firstRun" style="background:#16303a;border-color:#2b5a6b;color:var(--peso)">👋 Panel vacío. <b id="frImport">Importa tu JSON privado</b> (histórico completo) o empieza a registrar arriba. Tus datos nunca salen de este dispositivo.</div>
+
+<div class="card">
+  <h2>Registro de hoy</h2>
+  <div class="entry">
+    <div class="field">
+      <label>Fecha</label>
+      <input type="date" id="inDate">
+    </div>
+    <div class="field">
+      <label>Peso (kg)</label>
+      <input type="text" id="inW" inputmode="decimal">
+      <div class="steppers"><button data-t="w" data-v="-0.1">−0,1</button><button data-t="w" data-v="0.1">+0,1</button></div>
+    </div>
+    <div class="field">
+      <label>Grasa (%)</label>
+      <input type="text" id="inF" inputmode="decimal">
+      <div class="steppers"><button data-t="f" data-v="-0.1">−0,1</button><button data-t="f" data-v="0.1">+0,1</button></div>
+    </div>
+    <div class="field">
+      <label>Cintura (cm)</label>
+      <input type="text" id="inC" inputmode="decimal" placeholder="opcional">
+      <div class="steppers"><button data-t="c" data-v="-0.5">−0,5</button><button data-t="c" data-v="0.5">+0,5</button></div>
+    </div>
+  </div>
+  <div class="entry2">
+    <div class="field">
+      <label>Nota (opcional)</label>
+      <input type="text" id="inN" class="note" placeholder="viaje, cheat, enfermo…">
+    </div>
+    <div></div>
+    <button id="btnSave">Guardar</button>
+  </div>
+  <div id="saveMsg"></div>
+  <details>
+    <summary>Entrada por lotes (pegar varios días)</summary>
+    <textarea id="batchTxt" placeholder="12/07 73,4 18,6&#10;13/07 73,1 18,5 84,5 # nota opcional&#10;2026-07-14 72,9"></textarea>
+    <div class="hint">Una línea por día: fecha (dd/mm, dd/mm/aaaa o aaaa-mm-dd) · peso · grasa (opc.) · cintura (opc.) · «# nota» al final. Año actual si no se indica.</div>
+    <button class="mini" id="btnBatch">Procesar líneas</button>
+  </details>
+</div>
+
+<div class="card">
+  <h2>Ahora mismo</h2>
+  <div class="kpis" id="kpis"></div>
+</div>
+
+<div class="card">
+  <h2>Evolución</h2>
+  <div class="tabs" id="tabs">
+    <button data-m="evo" class="on">Serie</button>
+    <button data-m="years">Comparar años</button>
+    <button data-m="comp">Composición</button>
+  </div>
+  <div class="ranges" id="ranges">
+    <button data-r="30">1M</button>
+    <button data-r="90" class="on">3M</button>
+    <button data-r="180">6M</button>
+    <button data-r="365">1A</button>
+    <button data-r="1825">5A</button>
+    <button data-r="0">Todo</button>
+  </div>
+  <div class="yearsel" id="yearSel"></div>
+  <div class="series-toggles" id="togglesEvo">
+    <label><span class="sw" style="background:var(--peso)"></span><input type="checkbox" id="tgW" checked hidden>Peso</label>
+    <label><span class="sw" style="background:var(--acc)"></span><input type="checkbox" id="tgT" checked hidden>Tendencia (EMA)</label>
+    <label><span class="sw" style="background:var(--grasa)"></span><input type="checkbox" id="tgF" checked hidden>Grasa %</label>
+    <label><span class="sw" style="background:var(--magra)"></span><input type="checkbox" id="tgL" hidden>Masa magra</label>
+    <label><span class="sw" style="background:var(--cintura)"></span><input type="checkbox" id="tgC" hidden>Cintura</label>
+  </div>
+  <div id="chartWrap">
+    <canvas id="chart"></canvas>
+    <div id="tip"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Conclusiones automáticas</h2>
+  <div id="insights"></div>
+</div>
+
+<div class="card">
+  <h2>Resumen por año</h2>
+  <div style="overflow-x:auto"><table id="yearTable"></table></div>
+</div>
+
+<div class="card">
+  <h2>Últimos registros</h2>
+  <div class="reglist" id="regList"></div>
+</div>
+
+<div class="card">
+  <h2>Objetivo y ajustes</h2>
+  <div class="cfg">
+    <div class="field"><label>Altura (m)</label><input type="text" id="cfgH" inputmode="decimal"></div>
+    <div class="field"><label>Banda grasa: de (%)</label><input type="text" id="cfgB1" inputmode="decimal"></div>
+    <div class="field"><label>Banda grasa: a (%)</label><input type="text" id="cfgB2" inputmode="decimal"></div>
+    <div class="field"><label>Objetivo grasa (%)</label><input type="text" id="cfgGF" inputmode="decimal" placeholder="ej. 18"></div>
+    <div class="field"><label>Fecha objetivo</label><input type="date" id="cfgGD"></div>
+  </div>
+  <div class="hint">Se guarda automáticamente al salir del campo. La banda se pinta en verde sobre la gráfica de grasa.</div>
+  <h2 style="margin-top:16px">Hitos (marcas en la gráfica)</h2>
+  <div id="hitoList"></div>
+  <div class="hitoAdd">
+    <input type="date" id="hitoD">
+    <input type="text" id="hitoT" placeholder="ej. empiezo kettlebells">
+    <button class="mini" id="hitoAdd" style="margin-top:0">Añadir</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Copia de seguridad y datos</h2>
+  <div class="iobar">
+    <button id="btnExport">Exportar JSON</button>
+    <label>Importar JSON<input type="file" id="inImport" accept=".json"></label>
+    <button id="btnCSV">Exportar CSV</button>
+    <label>Importar Fitbit / CSV / XLSX<input type="file" id="inFitbit" accept=".csv,.xlsx,.xls"></label>
+  </div>
+  <div class="hint">El import de XLSX descarga SheetJS de internet solo en ese momento; el CSV funciona 100% offline. Acepta el CSV exportado por esta app, exports de Fitbit y hojas con columnas de fecha/peso/grasa (detecta libras y convierte).</div>
+</div>
+
+<div class="foot">
+  Grasa por bioimpedancia (orientativa: mira la tendencia, no el día) · Tendencia EMA tipo Hacker's Diet (10 %/día)<br>
+  📱 Instalable: Chrome/Android → «Instalar aplicación» · iOS/Safari → compartir → «Añadir a pantalla de inicio» · funciona sin conexión · v2.1
+</div>
+
+<script>
+/* ============ PWA (manifest por Blob, icono SVG) ============ */
+(function(){
+  const icon = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#12161b"/><circle cx="50" cy="46" r="26" fill="none" stroke="#ffd166" stroke-width="6"/><path d="M50 46 L62 32" stroke="#5ec8f2" stroke-width="6" stroke-linecap="round"/><rect x="30" y="76" width="40" height="8" rx="4" fill="#ffd166"/></svg>');
+  const man = {name:'Báscula', short_name:'Báscula', display:'standalone',
+    background_color:'#12161b', theme_color:'#12161b', start_url:location.href,
+    icons:[{src:icon, sizes:'any', type:'image/svg+xml', purposes:'any'}]};
+  try{
+    document.getElementById('manifestLink').href = URL.createObjectURL(new Blob([JSON.stringify(man)],{type:'application/json'}));
+    document.getElementById('appleIcon').href = icon;
+  }catch(e){}
+  /* service worker: solo cuando se sirve por https (GitHub Pages); en file:// se ignora */
+  if('serviceWorker' in navigator && location.protocol==='https:'){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+})();
+
+/* ============ DATOS Y AJUSTES ============ */
+const HIST = [];
+
+const LSD='bascula_v1', LSC='bascula_cfg', LSH='bascula_hitos', LSB='bascula_lastExport';
+const lsGet=(k,d)=>{ try{ const v=JSON.parse(localStorage.getItem(k)); return v==null?d:v }catch(e){ return d } };
+const lsSet=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+
+let CFG = Object.assign({h:1.75, b1:17, b2:19, gf:null, gd:null}, lsGet(LSC,{}));
+let HITOS = lsGet(LSH,[]);
+const loadManual=()=>lsGet(LSD,[]);
+const saveManual=a=>lsSet(LSD,a);
+
+function allData(){
+  const m={};
+  for(const e of HIST) m[e.d]={...e,src:'hist'};
+  for(const e of loadManual()) m[e.d]={...e,src:'manual'};
+  return Object.values(m).sort((a,b)=>a.d<b.d?-1:1);
+}
+
+/* ============ UTILS ============ */
+const $=id=>document.getElementById(id);
+const fmt1=n=>n==null?'–':n.toLocaleString('es-ES',{minimumFractionDigits:1,maximumFractionDigits:1});
+const fmt2=n=>n==null?'–':n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0=n=>n==null?'–':Math.round(n).toLocaleString('es-ES');
+const parseNum=s=>{ if(s==null||s==='')return null; const v=parseFloat(String(s).replace(',','.')); return isNaN(v)?null:v };
+const dstr=d=>{ const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()) };
+const fmtDate=s=>{ const [y,m,dd]=s.split('-'); return dd+'/'+m+'/'+y };
+const daysAgo=n=>{ const d=new Date(); d.setDate(d.getDate()-n); return dstr(d) };
+const DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+function ma7(data,key){
+  return data.map((e,i)=>{
+    const vals=data.slice(Math.max(0,i-6),i+1).map(x=>x[key]).filter(v=>v!=null);
+    return vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+  });
+}
+/* EMA tipo Hacker's Diet: 10%/día, ajustada a huecos */
+function ema(data,key){
+  let t=null, prev=null; const out=[];
+  for(const e of data){
+    const v=e[key];
+    if(v==null){ out.push(t); continue }
+    if(t==null){ t=v }
+    else{
+      const gap=Math.max(1,(new Date(e.d)-new Date(prev))/864e5);
+      t += (1-Math.pow(0.9,gap))*(v-t);
+    }
+    prev=e.d; out.push(t);
+  }
+  return out;
+}
+function slope(data,key,days,ref){ // unidades/semana, regresión
+  const end = ref||dstr(new Date());
+  const cut = (()=>{ const d=new Date(end); d.setDate(d.getDate()-days); return dstr(d) })();
+  const pts=data.filter(e=>e.d>=cut&&e.d<=end&&e[key]!=null).map(e=>[new Date(e.d).getTime()/864e5,e[key]]);
+  if(pts.length<4) return null;
+  const n=pts.length,sx=pts.reduce((a,p)=>a+p[0],0),sy=pts.reduce((a,p)=>a+p[1],0);
+  const sxx=pts.reduce((a,p)=>a+p[0]*p[0],0),sxy=pts.reduce((a,p)=>a+p[1]*p[0],0);
+  const den=n*sxx-sx*sx; if(!den) return null;
+  return (n*sxy-sx*sy)/den*7;
+}
+
+/* ============ ENTRADA ============ */
+$('inDate').value=dstr(new Date());
+function prefill(){
+  const d=allData(); if(!d.length) return;
+  const last=d[d.length-1];
+  $('inW').value=String(last.w).replace('.',',');
+  if(last.f!=null) $('inF').value=String(last.f).replace('.',',');
+  const lastC=[...d].reverse().find(e=>e.c!=null);
+  if(lastC) $('inC').value=String(lastC.c).replace('.',',');
+}
+prefill();
+document.querySelectorAll('.steppers button').forEach(b=>{
+  b.onclick=()=>{
+    const inp = b.dataset.t==='w'?$('inW'): b.dataset.t==='f'?$('inF'):$('inC');
+    let v=parseNum(inp.value); if(v==null) return;
+    v=Math.round((v+parseFloat(b.dataset.v))*10)/10;
+    inp.value=String(v).replace('.',',');
+  };
+});
+function saveEntry(d,w,f,c,n,silent){
+  const msg=$('saveMsg');
+  if(!d||w==null){ if(!silent){msg.textContent='Falta el peso (lo demás es opcional).';msg.className='warn'} return false }
+  if(w<40||w>150){ if(!silent){msg.textContent='Peso fuera de rango razonable (40–150 kg).';msg.className='warn'} return false }
+  if(f!=null&&(f<3||f>60)){ if(!silent){msg.textContent='% grasa fuera de rango razonable.';msg.className='warn'} return false }
+  if(c!=null&&(c<50||c>160)){ if(!silent){msg.textContent='Cintura fuera de rango razonable.';msg.className='warn'} return false }
+  const man=loadManual().filter(e=>e.d!==d);
+  const rec={d,w,f:f??null}; if(c!=null)rec.c=c; if(n)rec.n=n;
+  man.push(rec); saveManual(man);
+  return true;
+}
+$('btnSave').onclick=()=>{
+  const ok=saveEntry($('inDate').value,parseNum($('inW').value),parseNum($('inF').value),parseNum($('inC').value),$('inN').value.trim());
+  if(ok){
+    $('saveMsg').textContent='✓ Guardado '+fmtDate($('inDate').value)+' · '+fmt1(parseNum($('inW').value))+' kg';
+    $('saveMsg').className='ok'; $('inN').value='';
+    renderAll();
+  }
+};
+/* lotes */
+$('btnBatch').onclick=()=>{
+  const lines=$('batchTxt').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  let ok=0, bad=[];
+  const Y=new Date().getFullYear();
+  for(const line of lines){
+    let note=null, main=line;
+    const h=line.indexOf('#'); if(h>=0){ note=line.slice(h+1).trim(); main=line.slice(0,h) }
+    const toks=main.trim().split(/[\s;]+/);
+    if(!toks.length){ bad.push(line); continue }
+    let d=null, t=toks[0];
+    let m;
+    if(m=t.match(/^(\d{4})-(\d{2})-(\d{2})$/)) d=t;
+    else if(m=t.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/)){
+      let y=m[3]? (m[3].length===2?'20'+m[3]:m[3]) : String(Y);
+      d=y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+    }
+    if(!d){ bad.push(line); continue }
+    const nums=toks.slice(1).map(parseNum);
+    if(saveEntry(d,nums[0]??null,nums[1]??null,nums[2]??null,note,true)) ok++;
+    else bad.push(line);
+  }
+  $('saveMsg').textContent='✓ '+ok+' líneas guardadas'+(bad.length?' · '+bad.length+' con error: '+bad.slice(0,2).join(' | '):'');
+  $('saveMsg').className=bad.length?'warn':'ok';
+  if(ok){ $('batchTxt').value=bad.join('\n'); renderAll() }
+};
+
+/* ============ CONFIG ============ */
+function loadCfgUI(){
+  $('cfgH').value=String(CFG.h).replace('.',',');
+  $('cfgB1').value=CFG.b1!=null?String(CFG.b1).replace('.',','):'';
+  $('cfgB2').value=CFG.b2!=null?String(CFG.b2).replace('.',','):'';
+  $('cfgGF').value=CFG.gf!=null?String(CFG.gf).replace('.',','):'';
+  $('cfgGD').value=CFG.gd||'';
+}
+loadCfgUI();
+[['cfgH','h'],['cfgB1','b1'],['cfgB2','b2'],['cfgGF','gf']].forEach(([id,k])=>{
+  $(id).onchange=()=>{ const v=parseNum($(id).value); CFG[k]= v; if(k==='h'&&(!v||v<1||v>2.3)) CFG.h=1.75; lsSet(LSC,CFG); renderAll() };
+});
+$('cfgGD').onchange=()=>{ CFG.gd=$('cfgGD').value||null; lsSet(LSC,CFG); renderAll() };
+
+function renderHitos(){
+  HITOS.sort((a,b)=>a.d<b.d?-1:1);
+  $('hitoList').innerHTML = HITOS.length? HITOS.map((h,i)=>
+    `<div class="hito"><span style="color:var(--dim)">${fmtDate(h.d)}</span><span>${h.t}</span><button data-i="${i}">✕</button></div>`).join('')
+    : '<div class="hint">Sin hitos. Añade marcas como «empiezo kettlebells» o «vacaciones».</div>';
+  $('hitoList').querySelectorAll('button').forEach(b=>{
+    b.onclick=()=>{ HITOS.splice(+b.dataset.i,1); lsSet(LSH,HITOS); renderHitos(); drawChart() };
+  });
+}
+$('hitoAdd').onclick=()=>{
+  const d=$('hitoD').value, t=$('hitoT').value.trim();
+  if(!d||!t) return;
+  HITOS.push({d,t}); lsSet(LSH,HITOS);
+  $('hitoT').value=''; renderHitos(); drawChart();
+};
+renderHitos();
+
+/* ============ KPIs ============ */
+function renderKPIs(){
+  const d=allData(); if(!d.length) return;
+  const last=d[d.length-1];
+  const H=CFG.h||1.75;
+  const emaW=ema(d,'w'); const trendNow=emaW[emaW.length-1];
+  const m7f=ma7(d,'f'); const grasa7=m7f[m7f.length-1];
+  const sl30=slope(d,'w',30);
+  const magra=last.f!=null?last.w*(1-last.f/100):null;
+  const grasaKg=last.f!=null?last.w*last.f/100:null;
+  const imc=last.w/(H*H);
+  const minAll=d.reduce((a,e)=>Math.min(a,e.w),999);
+  let trendHtml='–',cls='flat';
+  if(sl30!=null){ cls=sl30<-0.05?'down':sl30>0.05?'up':'flat'; trendHtml=(sl30>0?'+':'')+fmt2(sl30)+' kg/sem' }
+
+  /* cintura */
+  const cRecs=d.filter(e=>e.c!=null);
+  let cintKpi='';
+  if(cRecs.length){
+    const lc=cRecs[cRecs.length-1];
+    const prev=[...cRecs].reverse().find(e=>e.d<=daysAgo(25));
+    const dc=prev? lc.c-prev.c : null;
+    cintKpi=`<div class="kpi"><div class="l">Cintura (${fmtDate(lc.d)})</div><div class="v cint">${fmt1(lc.c)}</div><div class="s">${dc!=null?(dc>0?'+':'')+fmt1(dc)+' cm en ~30d':'sin dato previo'}</div></div>`;
+  }
+
+  /* objetivo semáforo */
+  let goalKpi='';
+  if(CFG.gf!=null&&CFG.gd&&grasa7!=null){
+    const daysLeft=Math.round((new Date(CFG.gd)-new Date())/864e5);
+    const need=daysLeft>0? (grasa7-CFG.gf)/(daysLeft/7) : null; // pts/sem necesarios
+    const cur=slope(d,'f',45);
+    let col='#888', txt='sin datos';
+    if(daysLeft<=0){ col=grasa7<=CFG.gf?'var(--ok)':'var(--bad)'; txt=grasa7<=CFG.gf?'¡conseguido!':'fecha pasada' }
+    else if(need!=null&&cur!=null){
+      if(grasa7<=CFG.gf){ col='var(--ok)'; txt='¡ya estás!' }
+      else if(-cur>=need*0.95){ col='var(--ok)'; txt='en camino' }
+      else if(-cur>=need*0.6){ col='var(--acc)'; txt='justo' }
+      else { col='var(--bad)'; txt='ritmo insuficiente' }
+    }
+    goalKpi=`<div class="kpi"><div class="l">Objetivo ${fmt1(CFG.gf)} % · ${fmtDate(CFG.gd)}</div>
+      <div class="v" style="font-size:15px;padding-top:5px"><span class="sem" style="background:${col}"></span>${txt}</div>
+      <div class="s">${daysLeft>0?daysLeft+' días · necesitas '+fmt2(need)+' pts/sem':''}</div></div>`;
+  }
+
+  $('kpis').innerHTML=`
+    <div class="kpi"><div class="l">Peso (${fmtDate(last.d)})</div><div class="v peso">${fmt1(last.w)}</div><div class="s">tendencia EMA: ${fmt1(trendNow)} kg</div></div>
+    <div class="kpi"><div class="l">Tendencia 30d</div><div class="v"><span class="trend ${cls}">${trendHtml}</span></div><div class="s">≈ ${sl30!=null?fmt0(Math.abs(sl30)*7700/7)+' kcal/día de '+(sl30<0?'déficit':'superávit'):'–'}</div></div>
+    <div class="kpi"><div class="l">Grasa</div><div class="v grasa">${fmt1(last.f)} %</div><div class="s">media 7d: ${fmt1(grasa7)} % · ${fmt1(grasaKg)} kg</div></div>
+    <div class="kpi"><div class="l">Masa magra</div><div class="v magra">${fmt1(magra)} kg</div><div class="s">peso × (1 − grasa)</div></div>
+    ${cintKpi}
+    <div class="kpi"><div class="l">IMC</div><div class="v">${fmt1(imc)}</div><div class="s">altura ${fmt2(H)} m</div></div>
+    <div class="kpi"><div class="l">Mínimo histórico</div><div class="v">${fmt1(minAll)}</div><div class="s">te separan ${fmt1(last.w-minAll)} kg</div></div>
+    ${goalKpi}`;
+}
+
+/* ============ GRÁFICA ============ */
+let rangeDays=90, mode='evo';
+const cv=$('chart'), ctx=cv.getContext('2d');
+let plotted=[];
+const cssVar=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const YCOLORS=['#5ec8f2','#ffd166','#ff9066','#a4d96c','#c792ea','#f07178','#82aaff','#ffcb6b'];
+let yearChecks=null;
+
+function setupCanvas(){
+  const W=cv.clientWidth,H=cv.clientHeight,dpr=devicePixelRatio||1;
+  cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  return [W,H];
+}
+function gridY(x0,x1,y0,y1,vmin,vmax,leftColor,rightScale){
+  ctx.font='11px '+cssVar('--mono');ctx.textBaseline='middle';
+  for(let i=0;i<=5;i++){
+    const v=vmin+(vmax-vmin)*i/5, y=y1-(v-vmin)/(vmax-vmin)*(y1-y0);
+    ctx.strokeStyle='#232b34';ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
+    ctx.fillStyle=leftColor||cssVar('--faint');ctx.textAlign='right';ctx.fillText(v.toFixed(1),x0-6,y);
+    if(rightScale){
+      const rv=rightScale[0]+(rightScale[1]-rightScale[0])*i/5;
+      ctx.fillStyle=cssVar('--grasa');ctx.globalAlpha=.7;ctx.textAlign='left';
+      ctx.fillText(rv.toFixed(1),x1+6,y);ctx.globalAlpha=1;
+    }
+  }
+}
+function line(pts,color,width,dash){
+  ctx.strokeStyle=color;ctx.lineWidth=width;ctx.setLineDash(dash||[]);
+  ctx.beginPath();let st=false;
+  for(const p of pts){ if(p[1]==null){st=false;continue} if(!st){ctx.moveTo(p[0],p[1]);st=true} else ctx.lineTo(p[0],p[1]) }
+  ctx.stroke();ctx.setLineDash([]);
+}
+
+function drawEvo(){
+  const all=allData();
+  const cut=rangeDays?daysAgo(rangeDays):'0000';
+  const data=all.filter(e=>e.d>=cut);
+  const idx0=all.length-data.length;
+  const emaAll=ema(all,'w'); const emaW=emaAll.slice(idx0);
+  const [W,H]=setupCanvas(); plotted=[];
+  if(data.length<2){ ctx.fillStyle=cssVar('--dim');ctx.font='13px system-ui';ctx.fillText('Sin datos en este rango',20,40);return }
+
+  const showW=$('tgW').checked,showT=$('tgT').checked,showF=$('tgF').checked,showL=$('tgL').checked,showC=$('tgC').checked;
+  const padL=44,padR=showF?44:14,padT=16,padB=26;
+  const x0=padL,x1=W-padR,y0=padT,y1=H-padB;
+  const t0=new Date(data[0].d).getTime(),t1=new Date(data[data.length-1].d).getTime();
+  const X=d=>x0+(new Date(d).getTime()-t0)/(t1-t0||1)*(x1-x0);
+
+  let wVals=data.map(e=>e.w);
+  if(showL) wVals=wVals.concat(data.filter(e=>e.f!=null).map(e=>e.w*(1-e.f/100)));
+  let wMin=Math.min(...wVals),wMax=Math.max(...wVals);
+  const pad=Math.max(0.5,(wMax-wMin)*0.08);wMin-=pad;wMax+=pad;
+  const Yw=v=>y1-(v-wMin)/(wMax-wMin)*(y1-y0);
+
+  const fVals=data.filter(e=>e.f!=null).map(e=>e.f);
+  let fMin=fVals.length?Math.min(...fVals):0,fMax=fVals.length?Math.max(...fVals):1;
+  if(fVals.length&&CFG.b1!=null&&CFG.b2!=null){ fMin=Math.min(fMin,CFG.b1);fMax=Math.max(fMax,CFG.b2) }
+  const fpad=Math.max(0.3,(fMax-fMin)*0.1);fMin-=fpad;fMax+=fpad;
+  const Yf=v=>y1-(v-fMin)/(fMax-fMin)*(y1-y0);
+
+  /* banda objetivo de grasa */
+  if(showF&&fVals.length&&CFG.b1!=null&&CFG.b2!=null&&CFG.b2>CFG.b1){
+    ctx.fillStyle='rgba(123,216,143,0.10)';
+    const yA=Yf(CFG.b2),yB=Yf(CFG.b1);
+    ctx.fillRect(x0,yA,x1-x0,yB-yA);
+    ctx.strokeStyle='rgba(123,216,143,0.35)';ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(x0,yA);ctx.lineTo(x1,yA);ctx.moveTo(x0,yB);ctx.lineTo(x1,yB);ctx.stroke();ctx.setLineDash([]);
+  }
+
+  gridY(x0,x1,y0,y1,wMin,wMax,null,(showF&&fVals.length)?[fMin,fMax]:null);
+  ctx.fillStyle=cssVar('--faint');ctx.textAlign='center';
+  const nlab=Math.min(6,data.length);
+  for(let i=0;i<nlab;i++){
+    const e=data[Math.round(i*(data.length-1)/(nlab-1||1))];
+    const [y,m,dd]=e.d.split('-');
+    ctx.fillText(rangeDays&&rangeDays<=180?dd+'/'+m:m+'/'+y.slice(2),X(e.d),H-10);
+  }
+
+  /* hitos */
+  for(const h of HITOS){
+    if(h.d<data[0].d||h.d>data[data.length-1].d) continue;
+    const x=X(h.d);
+    ctx.strokeStyle='rgba(255,209,102,0.5)';ctx.setLineDash([3,4]);
+    ctx.beginPath();ctx.moveTo(x,y0);ctx.lineTo(x,y1);ctx.stroke();ctx.setLineDash([]);
+    ctx.save();ctx.translate(x+3,y0+2);ctx.rotate(Math.PI/2);
+    ctx.fillStyle='rgba(255,209,102,0.8)';ctx.font='10px system-ui';ctx.textAlign='left';
+    ctx.fillText(h.t.slice(0,26),0,0);ctx.restore();
+  }
+
+  if(showW){
+    const pts=data.map(e=>[X(e.d),Yw(e.w)]);
+    line(pts,cssVar('--peso')+'55',1);
+    ctx.fillStyle=cssVar('--peso');
+    for(let i=0;i<data.length;i++){
+      const p=pts[i];ctx.beginPath();ctx.arc(p[0],p[1],data.length>120?1.4:2.4,0,7);ctx.fill();
+      if(data[i].n){ ctx.strokeStyle=cssVar('--acc');ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(p[0],p[1],4.5,0,7);ctx.stroke() }
+      plotted.push({x:p[0],y:p[1],e:data[i]});
+    }
+  } else {
+    plotted=data.map(e=>({x:X(e.d),y:y1,e}));
+  }
+  if(showT) line(data.map((e,i)=>[X(e.d),emaW[i]!=null?Yw(emaW[i]):null]),cssVar('--acc'),2.2);
+  if(showL) line(data.map(e=>[X(e.d),e.f!=null?Yw(e.w*(1-e.f/100)):null]),cssVar('--magra'),1.8,[5,4]);
+  if(showF) line(data.map(e=>[X(e.d),e.f!=null?Yf(e.f):null]),cssVar('--grasa'),1.8);
+
+  /* cintura: escala propia oculta */
+  if(showC){
+    const cRecs=data.filter(e=>e.c!=null);
+    if(cRecs.length>=2){
+      let cMin=Math.min(...cRecs.map(e=>e.c)),cMax=Math.max(...cRecs.map(e=>e.c));
+      const cp=Math.max(0.5,(cMax-cMin)*0.15);cMin-=cp;cMax+=cp;
+      const Yc=v=>y1-(v-cMin)/(cMax-cMin)*(y1-y0);
+      line(data.map(e=>[X(e.d),e.c!=null?Yc(e.c):null]),cssVar('--cintura'),1.8,[2,3]);
+    }
+  }
+}
+
+function drawYears(){
+  const all=allData();
+  const byY={};
+  for(const e of all){ const y=e.d.slice(0,4); (byY[y]=byY[y]||[]).push(e) }
+  const years=Object.keys(byY).sort();
+  if(yearChecks==null){
+    yearChecks={}; years.slice(-3).forEach(y=>yearChecks[y]=true);
+  }
+  /* selector de años */
+  $('yearSel').innerHTML=years.map((y,i)=>`<label class="${yearChecks[y]?'on':''}" data-y="${y}">
+    <span class="sw" style="background:${YCOLORS[i%YCOLORS.length]}"></span>${y}</label>`).join('');
+  $('yearSel').querySelectorAll('label').forEach(l=>{
+    l.onclick=()=>{ yearChecks[l.dataset.y]=!yearChecks[l.dataset.y]; drawYears() };
+  });
+
+  const [W,H]=setupCanvas(); plotted=[];
+  const padL=44,padR=14,padT=16,padB=26;
+  const x0=padL,x1=W-padR,y0=padT,y1=H-padB;
+  const X=doy=>x0+(doy-1)/365*(x1-x0);
+
+  const sel=years.filter(y=>yearChecks[y]);
+  let vals=[];
+  const series={};
+  for(const y of sel){
+    const arr=byY[y];
+    const m7=ma7(arr,'w');
+    series[y]=arr.map((e,i)=>{
+      const dt=new Date(e.d);
+      const doy=Math.round((dt-new Date(dt.getFullYear(),0,0))/864e5);
+      return [X(doy),m7[i]];
+    });
+    vals=vals.concat(m7.filter(v=>v!=null));
+  }
+  if(!vals.length){ ctx.fillStyle=cssVar('--dim');ctx.font='13px system-ui';ctx.fillText('Selecciona algún año',20,40);return }
+  let vMin=Math.min(...vals),vMax=Math.max(...vals);
+  const p=Math.max(0.5,(vMax-vMin)*0.08);vMin-=p;vMax+=p;
+  const Y=v=>y1-(v-vMin)/(vMax-vMin)*(y1-y0);
+
+  gridY(x0,x1,y0,y1,vMin,vMax);
+  const MESES=['E','F','M','A','M','J','J','A','S','O','N','D'];
+  ctx.fillStyle=cssVar('--faint');ctx.textAlign='center';ctx.font='11px '+cssVar('--mono');
+  for(let m=0;m<12;m++) ctx.fillText(MESES[m],X(m*30.4+15),H-10);
+
+  for(const y of sel){
+    const i=years.indexOf(y);
+    line(series[y].map(pt=>[pt[0],pt[1]!=null?Y(pt[1]):null]),YCOLORS[i%YCOLORS.length],2);
+  }
+  ctx.fillStyle=cssVar('--dim');ctx.font='11px system-ui';ctx.textAlign='left';
+  ctx.fillText('Media móvil 7d de peso, superpuesta por día del año',x0,y0-4);
+}
+
+function drawComp(){
+  const all=allData();
+  const cut=rangeDays?daysAgo(rangeDays):'0000';
+  const data=all.filter(e=>e.d>=cut&&e.f!=null);
+  const [W,H]=setupCanvas(); plotted=[];
+  if(data.length<2){ ctx.fillStyle=cssVar('--dim');ctx.font='13px system-ui';ctx.fillText('Sin datos de grasa en este rango',20,40);return }
+  const padL=44,padR=14,padT=16,padB=26;
+  const x0=padL,x1=W-padR,y0=padT,y1=H-padB;
+  const t0=new Date(data[0].d).getTime(),t1=new Date(data[data.length-1].d).getTime();
+  const X=d=>x0+(new Date(d).getTime()-t0)/(t1-t0||1)*(x1-x0);
+  let vMax=Math.max(...data.map(e=>e.w))*1.03;
+  let vMin=Math.min(...data.map(e=>e.w*(1-e.f/100)))*0.97;
+  const Y=v=>y1-(v-vMin)/(vMax-vMin)*(y1-y0);
+
+  gridY(x0,x1,y0,y1,vMin,vMax);
+  ctx.fillStyle=cssVar('--faint');ctx.textAlign='center';
+  const nlab=Math.min(6,data.length);
+  for(let i=0;i<nlab;i++){
+    const e=data[Math.round(i*(data.length-1)/(nlab-1||1))];
+    const [y,m,dd]=e.d.split('-');
+    ctx.fillText(rangeDays&&rangeDays<=180?dd+'/'+m:m+'/'+y.slice(2),X(e.d),H-10);
+  }
+  /* área magra */
+  ctx.beginPath();ctx.moveTo(X(data[0].d),y1);
+  for(const e of data) ctx.lineTo(X(e.d),Y(e.w*(1-e.f/100)));
+  ctx.lineTo(X(data[data.length-1].d),y1);ctx.closePath();
+  ctx.fillStyle='rgba(164,217,108,0.30)';ctx.fill();
+  /* área grasa (entre magra y peso) */
+  ctx.beginPath();
+  ctx.moveTo(X(data[0].d),Y(data[0].w*(1-data[0].f/100)));
+  for(const e of data) ctx.lineTo(X(e.d),Y(e.w));
+  for(let i=data.length-1;i>=0;i--){ const e=data[i]; ctx.lineTo(X(e.d),Y(e.w*(1-e.f/100))) }
+  ctx.closePath();
+  ctx.fillStyle='rgba(255,144,102,0.35)';ctx.fill();
+  line(data.map(e=>[X(e.d),Y(e.w)]),cssVar('--grasa'),1.5);
+  line(data.map(e=>[X(e.d),Y(e.w*(1-e.f/100))]),cssVar('--magra'),1.8);
+  ctx.font='11.5px system-ui';ctx.textAlign='left';
+  ctx.fillStyle=cssVar('--magra');ctx.fillText('masa magra (kg)',x0+6,Y(data[0].w*(1-data[0].f/100))+14);
+  ctx.fillStyle=cssVar('--grasa');ctx.fillText('masa grasa encima',x0+6,Y(data[0].w)-8);
+  plotted=data.map(e=>({x:X(e.d),y:Y(e.w),e}));
+}
+
+function drawChart(){
+  $('ranges').style.display = mode==='years'?'none':'flex';
+  $('yearSel').style.display = mode==='years'?'flex':'none';
+  $('togglesEvo').style.display = mode==='evo'?'flex':'none';
+  if(mode==='evo') drawEvo();
+  else if(mode==='years') drawYears();
+  else drawComp();
+}
+
+/* tooltip */
+function showTip(ev){
+  if(!plotted.length||mode==='years') return;
+  const r=cv.getBoundingClientRect();
+  const mx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+  let best=null,bd=1e9;
+  for(const p of plotted){ const d=Math.abs(p.x-mx); if(d<bd){bd=d;best=p} }
+  if(!best||bd>40){ $('tip').style.display='none';return }
+  const e=best.e;
+  const magra=e.f!=null?e.w*(1-e.f/100):null;
+  $('tip').innerHTML=`<div class="td">${fmtDate(e.d)}${e.src==='manual'?' ·manual':''}</div>
+    <div style="color:var(--peso)">peso ${fmt1(e.w)} kg</div>`+
+    (e.f!=null?`<div style="color:var(--grasa)">grasa ${fmt1(e.f)} % (${fmt1(e.w*e.f/100)} kg)</div>
+    <div style="color:var(--magra)">magra ${fmt1(magra)} kg</div>`:'')+
+    (e.c!=null?`<div style="color:var(--cintura)">cintura ${fmt1(e.c)} cm</div>`:'')+
+    (e.n?`<div class="tn">${e.n}</div>`:'');
+  const tip=$('tip');tip.style.display='block';
+  const tw=tip.offsetWidth;
+  tip.style.left=Math.min(Math.max(4,best.x-tw/2),cv.clientWidth-tw-4)+'px';
+  tip.style.top=Math.max(4,best.y-tip.offsetHeight-12)+'px';
+}
+cv.addEventListener('mousemove',showTip);
+cv.addEventListener('touchstart',showTip,{passive:true});
+cv.addEventListener('touchmove',showTip,{passive:true});
+cv.addEventListener('mouseleave',()=>$('tip').style.display='none');
+
+$('tabs').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{ $('tabs').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); mode=b.dataset.m; $('tip').style.display='none'; drawChart() };
+});
+$('ranges').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{ $('ranges').querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); rangeDays=+b.dataset.r; drawChart() };
+});
+[['tgW',1],['tgT',1],['tgF',1],['tgL',0],['tgC',0]].forEach(([id,def])=>{
+  $(id).parentElement.style.opacity=def?1:.4;
+  $(id).parentElement.onclick=ev=>{ ev.preventDefault(); $(id).checked=!$(id).checked;
+    $(id).parentElement.style.opacity=$(id).checked?1:.4; drawChart() };
+});
+window.addEventListener('resize',()=>drawChart());
+
+/* ============ CONCLUSIONES ============ */
+function renderInsights(){
+  const d=allData(); const out=[];
+  if(!d.length){ $('insights').innerHTML='<div class="hint">Sin datos todavía: importa tu JSON o registra tu primer pesaje.</div>'; return }
+  const add=(ico,html)=>out.push(`<div class="insight"><div class="ico">${ico}</div><div>${html}</div></div>`);
+  const last=d[d.length-1];
+  const m7f=ma7(d,'f'); const f7=m7f[m7f.length-1];
+
+  /* ritmo 30d + déficit implícito */
+  const s30=slope(d,'w',30);
+  if(s30!=null){
+    const kcal=fmt0(Math.abs(s30)*7700/7);
+    if(s30<-0.8) add('⚠️',`Estás bajando <b>${fmt2(-s30)} kg/sem</b> (≈ <b>${kcal} kcal/día</b> de déficit): es un ritmo alto. Por encima de ~0,5–0,7 kg/sem sueles arrastrar músculo, no solo grasa. Valora comer un poco más.`);
+    else if(s30<-0.15) add('✅',`Ritmo de bajada <b class="good">${fmt2(-s30)} kg/sem</b> (≈ <b>${kcal} kcal/día</b> de déficit) en 30 días: rango sostenible para perder grasa conservando músculo.`);
+    else if(s30>0.15) add('📈',`Peso subiendo <b>${fmt2(s30)} kg/sem</b> (≈ <b>${kcal} kcal/día</b> de superávit) en los últimos 30 días.`);
+    else add('➖',`Peso estable en los últimos 30 días (<b>${fmt2(s30)} kg/sem</b>).`);
+  }
+
+  /* meseta */
+  const s21w=slope(d,'w',21), s21f=slope(d,'f',21);
+  const atGoal=CFG.gf!=null&&f7!=null&&f7<=CFG.gf;
+  if(!atGoal&&s21w!=null&&Math.abs(s21w)<0.1&&(s21f==null||s21f>-0.05)){
+    add('🛑',`<b class="warn2">Posible meseta</b>: 3 semanas con peso y grasa planos. Opciones clásicas: recalcular calorías al peso actual, subir NEAT (pasos diarios), meter 1–2 semanas de mantenimiento y volver, y revisar sueño/estrés.`);
+  }
+
+  /* recomposición 60d */
+  const cut60=daysAgo(60);
+  const win=d.filter(e=>e.d>=cut60&&e.f!=null);
+  if(win.length>=8){
+    const half=Math.floor(win.length/2);
+    const avg=(arr,fn)=>arr.reduce((a,e)=>a+fn(e),0)/arr.length;
+    const l1=avg(win.slice(0,half),e=>e.w*(1-e.f/100)),l2=avg(win.slice(half),e=>e.w*(1-e.f/100));
+    const g1=avg(win.slice(0,half),e=>e.w*e.f/100),g2=avg(win.slice(half),e=>e.w*e.f/100);
+    const dl=l2-l1,dg=g2-g1;
+    if(dg<-0.3&&dl>-0.3) add('💪',`<b class="good">Recomposición en marcha</b> (últimos 60 días): masa grasa <b>${dg>0?'+':''}${fmt1(dg)} kg</b> y masa magra <b>${dl>0?'+':''}${fmt1(dl)} kg</b>. Justo el objetivo: menos barriga sin perder músculo.`);
+    else if(dg<-0.3&&dl<=-0.3) add('⚠️',`Estás perdiendo grasa (<b>${fmt1(dg)} kg</b>) pero también masa magra (<b>${fmt1(dl)} kg</b>) en 60 días. Revisa proteína y mantén las kettlebells.`);
+    else if(dg>0.3) add('👀',`La masa grasa ha subido <b>${fmt1(dg)} kg</b> en 60 días.`);
+    else add('➖',`Composición estable en los últimos 60 días (grasa ${dg>0?'+':''}${fmt1(dg)} kg, magra ${dl>0?'+':''}${fmt1(dl)} kg).`);
+  }
+
+  /* cintura */
+  const cRecs=d.filter(e=>e.c!=null);
+  if(cRecs.length>=3){
+    const sc=slope(d,'c',45);
+    if(sc!=null){
+      if(sc<-0.1) add('📏',`Cintura bajando <b class="good">${fmt2(-sc)} cm/sem</b>: para «bajar barriga» este es el mejor indicador, más fiable que la bioimpedancia.`);
+      else if(sc>0.1) add('📏',`Cintura subiendo <b>${fmt2(sc)} cm/sem</b> en las últimas semanas.`);
+      else add('📏',`Cintura estable (${fmt1(cRecs[cRecs.length-1].c)} cm).`);
+    }
+  } else {
+    add('📏',`Apunta la <b>cintura</b> 1–2 veces por semana (misma hora, sin apretar): para el objetivo «barriga» es mejor señal que el % de la báscula.`);
+  }
+
+  /* histórico */
+  const min=d.reduce((a,e)=>e.w<a.w?e:a);
+  const max=d.reduce((a,e)=>e.w>a.w?e:a);
+  add('📊',`Desde el máximo (<b>${fmt1(max.w)} kg</b>, ${fmtDate(max.d)}) has bajado <b class="good">${fmt1(max.w-last.w)} kg</b>. Tu mínimo fue <b>${fmt1(min.w)} kg</b> (${fmtDate(min.d)}), a ${fmt1(last.w-min.w)} kg de distancia.`);
+
+  /* hito grasa */
+  if(f7!=null){
+    const next=Math.floor(f7);
+    const sf=slope(d,'f',45);
+    if(sf!=null&&sf<-0.02){
+      const weeks=(f7-next)/(-sf);
+      if(weeks>0&&weeks<52) add('🎯',`Grasa media 7d: <b style="color:var(--grasa)">${fmt1(f7)} %</b>, bajando ~${fmt2(-sf)} pts/sem. A este ritmo cruzas el <b>${next} %</b> en ~<b>${Math.round(weeks)} semanas</b>.`);
+    } else add('🧭',`Grasa media 7d: <b>${fmt1(f7)} %</b>, sin tendencia clara de bajada las últimas semanas.`);
+  }
+
+  /* efecto día de la semana */
+  const cut120=daysAgo(120);
+  const emaAll=ema(d,'w');
+  const res={};
+  d.forEach((e,i)=>{
+    if(e.d<cut120||emaAll[i]==null) return;
+    const dow=new Date(e.d+'T12:00').getDay();
+    (res[dow]=res[dow]||[]).push(e.w-emaAll[i]);
+  });
+  let peak=null;
+  for(const k in res){ if(res[k].length>=5){ const m=res[k].reduce((a,b)=>a+b,0)/res[k].length; if(!peak||m>peak.m) peak={d:+k,m} } }
+  if(peak&&peak.m>0.15) add('📅',`Patrón semanal: los <b>${DOW[peak.d]}</b> pesas de media <b>+${fmt2(peak.m)} kg</b> sobre tu tendencia (últimos 120 días). No es grasa, es el fin de semana: compárate lunes contra lunes.`);
+
+  /* constancia */
+  const n30=d.filter(e=>e.d>=daysAgo(30)).length;
+  if(n30>=25) add('🔁',`<b class="good">${n30} pesajes en 30 días</b>: la tendencia EMA es muy fiable; ignora el dato de un día suelto.`);
+  else if(n30>=10) add('🔁',`${n30} pesajes en los últimos 30 días. Cuantos más días, más fiable la tendencia.`);
+  else add('🔁',`Solo ${n30} pesajes en 30 días: la tendencia puede engañar. Pésate a la misma hora, mejor por la mañana.`);
+
+  $('insights').innerHTML=out.join('');
+}
+
+/* ============ TABLA ANUAL ============ */
+function renderYears(){
+  const d=allData(); const byY={};
+  if(!d.length){ $('yearTable').innerHTML=''; return }
+  for(const e of d){ const y=e.d.slice(0,4); (byY[y]=byY[y]||[]).push(e) }
+  const years=Object.keys(byY).sort();
+  const rows=years.map(y=>{
+    const a=byY[y];
+    const ws=a.map(e=>e.w),fs=a.filter(e=>e.f!=null).map(e=>e.f);
+    return {y,n:a.length,
+      avgW:ws.reduce((x,b)=>x+b,0)/ws.length,
+      avgF:fs.length?fs.reduce((x,b)=>x+b,0)/fs.length:null,
+      min:Math.min(...ws),max:Math.max(...ws)};
+  });
+  const wmin=Math.min(...rows.map(r=>r.avgW)),wmax=Math.max(...rows.map(r=>r.avgW));
+  const curY=String(new Date().getFullYear());
+  $('yearTable').innerHTML='<tr><th>Año</th><th>N</th><th>Peso medio</th><th></th><th>Grasa media</th><th>Mín</th><th>Máx</th></tr>'+
+    rows.map(r=>`<tr class="${r.y===curY?'cur':''}"><td>${r.y}</td><td>${r.n}</td><td>${fmt1(r.avgW)}</td>
+      <td style="text-align:left"><span class="bar" style="width:${8+(r.avgW-wmin)/(wmax-wmin||1)*70}px"></span></td>
+      <td>${fmt1(r.avgF)}</td><td>${fmt1(r.min)}</td><td>${fmt1(r.max)}</td></tr>`).join('');
+}
+
+/* ============ LISTA ============ */
+function renderRegs(){
+  const d=allData().slice().reverse().slice(0,60);
+  $('regList').innerHTML=d.map(e=>`
+    <div class="reg">
+      <span class="d">${fmtDate(e.d)}</span>
+      <span style="color:var(--peso)">${fmt1(e.w)} kg</span>
+      <span style="color:var(--grasa)">${e.f!=null?fmt1(e.f)+' %':'–'}</span>
+      <span style="color:var(--cintura)">${e.c!=null?fmt1(e.c)+' cm':''}</span>
+      <span class="nt" title="${e.n||''}">${e.n||''}</span>
+      ${e.src==='manual'?`<button data-d="${e.d}" title="Borrar">✕</button>`:'<span></span>'}
+    </div>`).join('');
+  $('regList').querySelectorAll('button').forEach(b=>{
+    b.onclick=()=>{ if(confirm('¿Borrar el registro del '+fmtDate(b.dataset.d)+'?')){
+      saveManual(loadManual().filter(e=>e.d!==b.dataset.d)); renderAll(); } };
+  });
+}
+
+/* ============ BACKUP ============ */
+function download(name,text,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();
+  URL.revokeObjectURL(a.href);
+}
+function markExported(){ lsSet(LSB,dstr(new Date())); renderBanner() }
+function renderBanner(){
+  const lastEx=lsGet(LSB,null);
+  const days=lastEx?Math.round((new Date()-new Date(lastEx))/864e5):999;
+  const manualCount=loadManual().length;
+  if(manualCount>0&&days>=30){
+    $('bkDays').textContent=lastEx?days:'∞ (nunca)';
+    $('bkBanner').style.display='block';
+  } else $('bkBanner').style.display='none';
+}
+$('bkNow').onclick=()=>$('btnExport').click();
+function doExportJSON(){
+  download('bascula_backup_'+dstr(new Date())+'.json',
+    JSON.stringify({schema:'bascula_v2',exported:dstr(new Date()),settings:CFG,milestones:HITOS,data:allData()},null,1),
+    'application/json');
+  markExported();
+}
+$('btnExport').onclick=doExportJSON;
+$('btnCSV').onclick=()=>{
+  const rows=['fecha;peso_kg;grasa_pct;masa_magra_kg;cintura_cm;nota'];
+  for(const e of allData()){
+    const magra=e.f!=null?(e.w*(1-e.f/100)).toFixed(2):'';
+    rows.push([e.d,String(e.w).replace('.',','),e.f!=null?String(e.f).replace('.',','):'',
+      String(magra).replace('.',','),e.c!=null?String(e.c).replace('.',','):'',
+      e.n?'"'+e.n.replace(/"/g,"'")+'"':''].join(';'));
+  }
+  download('bascula_'+dstr(new Date())+'.csv','\uFEFF'+rows.join('\n'),'text/csv');
+  markExported();
+};
+function mergeRecords(arr){
+  let n=0; const man=loadManual(); const idx={}; man.forEach((e,i)=>idx[e.d]=i);
+  for(const e of arr){
+    const d=e.d||e.date, w=e.w??e.weight_kg, ff=e.f??e.body_fat_pct??null;
+    if(!d||w==null) continue;
+    const rec={d,w:+w,f:ff!=null?+ff:null};
+    if(e.c!=null)rec.c=+e.c; if(e.n)rec.n=e.n;
+    if(idx[d]!=null) man[idx[d]]=rec; else { idx[d]=man.length; man.push(rec) }
+    n++;
+  }
+  saveManual(man); return n;
+}
+$('inImport').onchange=ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const j=JSON.parse(r.result);
+      const arr=Array.isArray(j)?j:(j.data||j.recent_manual_measurements_kg||[]);
+      const n=mergeRecords(arr);
+      if(j.settings){ CFG=Object.assign(CFG,j.settings); lsSet(LSC,CFG); loadCfgUI() }
+      if(Array.isArray(j.milestones)&&j.milestones.length){
+        const seen=new Set(HITOS.map(h=>h.d+'|'+h.t));
+        for(const h of j.milestones) if(h.d&&h.t&&!seen.has(h.d+'|'+h.t)) HITOS.push(h);
+        lsSet(LSH,HITOS); renderHitos();
+      }
+      renderAll();
+      $('saveMsg').textContent='✓ Importados '+n+' registros';$('saveMsg').className='ok';
+    }catch(e){ alert('No se pudo leer el JSON: '+e.message) }
+    ev.target.value='';
+  };
+  r.readAsText(f);
+};
+
+/* ---- import Fitbit / CSV / XLSX ---- */
+function guessCols(header){
+  const H=header.map(h=>String(h).toLowerCase().trim());
+  const find=(...keys)=>{ for(const k of keys){ const i=H.findIndex(h=>h.includes(k)); if(i>=0) return i } return -1 };
+  return {
+    d: find('fecha','date','datetime','time'),
+    wkg: find('peso_kg','weight_kg','peso (kg)','kg'),
+    wlb: find('weight_lb','lb','pound','libra'),
+    w: find('peso','weight'),
+    f: find('grasa','fat'),
+    c: find('cintura','waist')
+  };
+}
+function normDate(v){
+  if(v instanceof Date) return dstr(v);
+  const s=String(v).trim();
+  let m;
+  if(m=s.match(/^(\d{4})-(\d{2})-(\d{2})/)) return m[1]+'-'+m[2]+'-'+m[3];
+  if(m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/)){
+    let y=m[3].length===2?'20'+m[3]:m[3];
+    return y+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+  }
+  return null;
+}
+function rowsToRecords(rows){
+  if(!rows.length) return [];
+  const cols=guessCols(rows[0]);
+  if(cols.d<0) return [];
+  const out=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; if(!r||!r.length) continue;
+    const d=normDate(r[cols.d]); if(!d) continue;
+    let w=null, isLb=false;
+    if(cols.wkg>=0&&r[cols.wkg]!=null&&r[cols.wkg]!=='') w=parseNum(r[cols.wkg]);
+    else if(cols.wlb>=0&&r[cols.wlb]!=null&&r[cols.wlb]!==''){ w=parseNum(r[cols.wlb]); isLb=true }
+    else if(cols.w>=0) w=parseNum(r[cols.w]);
+    if(w==null) continue;
+    if(isLb||w>140) w=Math.round(w*0.45359237*100)/100;
+    const rec={d,w};
+    if(cols.f>=0){ const f=parseNum(r[cols.f]); if(f!=null&&f>2&&f<60) rec.f=Math.round(f*100)/100 }
+    if(cols.c>=0){ const c=parseNum(r[cols.c]); if(c!=null) rec.c=c }
+    out.push(rec);
+  }
+  return out;
+}
+function parseCSVtext(text){
+  const sep=text.split('\n')[0].includes(';')?';':',';
+  return text.replace(/^\uFEFF/,'').split(/\r?\n/).filter(l=>l.trim()).map(l=>{
+    const out=[];let cur='',q=false;
+    for(const ch of l){
+      if(ch==='"'){q=!q}
+      else if(ch===sep&&!q){out.push(cur);cur=''}
+      else cur+=ch;
+    }
+    out.push(cur);return out;
+  });
+}
+$('inFitbit').onchange=ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const done=recs=>{
+    if(!recs.length){ alert('No he reconocido columnas de fecha/peso en el archivo.'); return }
+    const n=mergeRecords(recs); renderAll();
+    $('saveMsg').textContent='✓ Importados '+n+' registros de '+f.name;$('saveMsg').className='ok';
+  };
+  if(/\.(xlsx|xls)$/i.test(f.name)){
+    const go=()=>{
+      const r=new FileReader();
+      r.onload=()=>{
+        try{
+          const wb=XLSX.read(new Uint8Array(r.result),{type:'array',cellDates:true});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
+          done(rowsToRecords(rows));
+        }catch(e){ alert('Error leyendo XLSX: '+e.message) }
+      };
+      r.readAsArrayBuffer(f);
+    };
+    if(window.XLSX) go();
+    else{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=go;
+      s.onerror=()=>alert('Sin conexión: no se pudo cargar SheetJS. Exporta a CSV y usa ese formato (funciona offline).');
+      document.head.appendChild(s);
+    }
+  } else {
+    const r=new FileReader();
+    r.onload=()=>done(rowsToRecords(parseCSVtext(r.result)));
+    r.readAsText(f);
+  }
+  ev.target.value='';
+};
+
+/* ============ RENDER ============ */
+function renderAll(){
+  $('firstRun').style.display = allData().length? 'none':'block';
+  renderKPIs(); drawChart(); renderInsights(); renderYears(); renderRegs(); renderBanner(); prefill();
+}
+$('firstRun').style.display='block';
+$('frImport').onclick=()=>$('inImport').click();
+renderAll();
+</script>
+</body>
+</html>
